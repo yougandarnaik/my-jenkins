@@ -1,17 +1,27 @@
 node {
-    stage "Create build output"
-    
-    // Make the output directory.
-    sh "mkdir -p output"
+    // Get Artifactory server instance, defined in the Artifactory Plugin administration page.
+    def server = Artifactory.server "SERVER_ID"
+    // Create an Artifactory Gradle instance.
+    def rtGradle = Artifactory.newGradleBuild()
+    def buildInfo
 
-    // Write an useful file, which is needed to be archived.
-    writeFile file: "output/usefulfile.txt", text: "This file is useful, need to archive it."
+    stage('Clone sources') {
+        git url: 'https://github.com/jfrogdev/project-examples.git'
+    }
 
-    // Write an useless file, which is not needed to be archived.
-    writeFile file: "output/uselessfile.md", text: "This file is useless, no need to archive it."
+    stage('Artifactory configuration') {
+        // Tool name from Jenkins configuration
+        rtGradle.tool = "Gradle-2.4"
+        // Set Artifactory repositories for dependencies resolution and artifacts deployment.
+        rtGradle.deployer repo:'ext-release-local', server: server
+        rtGradle.resolver repo:'remote-repos', server: server
+    }
 
-    stage "Archive build output"
-    
-    // Archive the build output artifacts.
-    archiveArtifacts artifacts: 'output/*.txt', excludes: 'output/*.md'
+    stage('Gradle build') {
+        buildInfo = rtGradle.run rootDir: "gradle-examples/4/gradle-example-ci-server/", buildFile: 'build.gradle', tasks: 'clean artifactoryPublish'
+    }
+
+    stage('Publish build info') {
+        server.publishBuildInfo buildInfo
+    }
 }

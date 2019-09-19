@@ -1,4 +1,3 @@
-
 node {
    def sonarUrl = 'sonar.host.url=http://172.31.30.136:9000'
    def mvn = tool (name: 'maven3', type: 'maven') + '/bin/mvn'
@@ -17,8 +16,7 @@ node {
 	 }
       
    }
-   
-	
+   	
    stage('Mvn Package'){
 	   // Build using maven
 	   
@@ -38,6 +36,7 @@ node {
 		  sh "ssh ec2-user@${tomcatDevIp} ${tomcatStart}"
        }
    }
+	
    stage('Email Notification'){
 		mail bcc: '', body: """Hi Team, You build successfully deployed
 		                       Job URL : ${env.JOB_URL}

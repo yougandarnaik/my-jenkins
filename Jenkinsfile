@@ -1,17 +1,27 @@
-// This is currently the best way to push a tag (or a branch, etc) from a
-// Pipeline job. It's not ideal - https://issues.jenkins-ci.org/browse/JENKINS-28335
-// is an open JIRA for getting the GitPublisher Jenkins functionality working
-// with Pipeline.
-
-// credentialsId here is the credentials you have set up in Jenkins for pushing
-// to that repository using username and password.
-withCredentials([usernamePassword(credentialsId: 'git-pass-credentials-ID', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME')]) {
-    sh("git tag -a some_tag -m 'Jenkins'")
-    sh('git push https://${GIT_USERNAME}:${GIT_PASSWORD}@<REPO> --tags')
+// The script triggers PayloadJob on every node.
+// It uses Node and Label Parameter plugin to pass the job name to the payload job.
+// The code will require approval of several Jenkins classes in the Script Security mode
+def branches = [:]
+def names = nodeNames()
+for (int i=0; i<names.size(); ++i) {
+  def nodeName = names[i];
+  // Into each branch we put the pipeline code we want to execute
+  branches["node_" + nodeName] = {
+    node(nodeName) {
+      echo "Triggering on " + nodeName
+      build job: 'PayloadJob', parameters: [
+              new org.jvnet.jenkins.plugins.nodelabelparameter.NodeParameterValue
+                  ("TARGET_NODE", "description", nodeName)
+          ]
+    }
+  }
 }
 
-// For SSH private key authentication, try the sshagent step from the SSH Agent plugin.
-sshagent (credentials: ['git-ssh-credentials-ID']) {
-    sh("git tag -a some_tag -m 'Jenkins'")
-    sh('git push <REPO> --tags')
+// Now we trigger all branches
+parallel branches
+
+// This method collects a list of Node names from the current Jenkins instance
+@NonCPS
+def nodeNames() {
+  return jenkins.model.Jenkins.instance.nodes.collect { node -> node.name }
 }

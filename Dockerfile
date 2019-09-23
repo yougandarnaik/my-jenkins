@@ -1,20 +1,20 @@
 # Install a more up to date mongodb than what is included in the default ubuntu repositories.
 
-FROM ubuntu
-MAINTAINER Clayton Coleman <yougandarnaik@gmail.com>
-
-RUN apt-get update
-RUN apt-get -y install apt-utils
-RUN apt-get -y install mongodb-10gen
-
-RUN mkdir -p /var/lib/mongodb && \
-    touch /var/lib/mongodb/.keep && \
-    chown -R mongodb:mongodb /var/lib/mongodb
-
-VOLUME ["/var/lib/mongodb"]
-USER mongodb
-
-ADD mongodb.conf /etc/mongodb.conf
-
-EXPOSE 27017
-CMD ["/usr/bin/mongod", "--config", "/etc/mongodb.conf"]
+FROM jenkins/jenkins:lts
+USER root
+RUN apt-get update && \
+apt-get -y install apt-transport-https \
+    ca-certificates \
+    curl \
+    gnupg2 \
+    software-properties-common && \
+curl -fsSL https://download.docker.com/linux/$(. /etc/os-release; echo "$ID")/gpg > /tmp/dkey; apt-key add /tmp/dkey && \
+add-apt-repository \
+    "deb [arch=amd64] https://download.docker.com/linux/$(. /etc/os-release; echo "$ID") \
+    $(lsb_release -cs) \
+    stable" && \
+apt-get update && \
+apt-get -y install docker-ce
+RUN apt-get install -y docker-ce
+RUN usermod -a -G docker jenkins
+USER jenkins

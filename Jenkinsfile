@@ -1,49 +1,17 @@
-node {
-   def sonarUrl = 'sonar.host.url=http://172.31.30.136:9000'
-   def mvn = tool (name: 'maven3', type: 'maven') + '/bin/mvn'
-   stage('SCM Checkout'){
-    // Clone repo
-	git branch: 'master', 
-	credentialsId: 'github', 
-	url: 'https://github.com/javahometech/myweb'
-   
-   }
-   
-   stage('Sonar Publish'){
-	   withCredentials([string(credentialsId: 'sonarqube', variable: 'sonarToken')]) {
-        def sonarToken = "sonar.login=${sonarToken}"
-        sh "${mvn} sonar:sonar -D${sonarUrl}  -D${sonarToken}"
-	 }
-      
-   }
-   	
-   stage('Mvn Package'){
-	   // Build using maven
-	   
-	   sh "${mvn} clean package deploy"
-   }
-   
-   stage('deploy-dev'){
-       def tomcatDevIp = '172.31.28.172'
-	   def tomcatHome = '/opt/tomcat8/'
-	   def webApps = tomcatHome+'webapps/'
-	   def tomcatStart = "${tomcatHome}bin/startup.sh"
-	   def tomcatStop = "${tomcatHome}bin/shutdown.sh"
-	   
-	   sshagent (credentials: ['tomcat-dev']) {
-	      sh "scp -o StrictHostKeyChecking=no target/myweb*.war ec2-user@${tomcatDevIp}:${webApps}myweb.war"
-          sh "ssh ec2-user@${tomcatDevIp} ${tomcatStop}"
-		  sh "ssh ec2-user@${tomcatDevIp} ${tomcatStart}"
-       }
-   }
-	
-   stage('Email Notification'){
-		mail bcc: '', body: """Hi Team, You build successfully deployed
-		                       Job URL : ${env.JOB_URL}
-							   Job Name: ${env.JOB_NAME}
+// This is currently the best way to push a tag (or a branch, etc) from a
+// Pipeline job. It's not ideal - https://issues.jenkins-ci.org/browse/JENKINS-28335
+// is an open JIRA for getting the GitPublisher Jenkins functionality working
+// with Pipeline.
 
-Thanks,
-DevOps Team""", cc: '', from: '', replyTo: '', subject: "${env.JOB_NAME} Success", to: 'hari.kammana@gmail.com'
-   
-   }
+// credentialsId here is the credentials you have set up in Jenkins for pushing
+// to that repository using username and password.
+withCredentials([usernamePassword(credentialsId: 'git-pass-credentials-ID', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME')]) {
+    sh("git tag -a some_tag -m 'Jenkins'")
+    sh('git push https://${GIT_USERNAME}:${GIT_PASSWORD}@<REPO> --tags')
+}
+
+// For SSH private key authentication, try the sshagent step from the SSH Agent plugin.
+sshagent (credentials: ['git-ssh-credentials-ID']) {
+    sh("git tag -a some_tag -m 'Jenkins'")
+    sh('git push <REPO> --tags')
 }
